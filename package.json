@@ -1,0 +1,24 @@
+{
+  "name": "landing-components-library",
+  "version": "1.0.0",
+  "description": "Biblioteca de componentes HTML reutilizables para landing pages, servicios y funnels de ventas",
+  "scripts": {
+    "build": "tailwindcss -i ./assets/css/input.css -o ./assets/css/output.css",
+    "watch": "tailwindcss -i ./assets/css/input.css -o ./assets/css/output.css --watch",
+    "build:prod": "tailwindcss -i ./assets/css/input.css -o ./assets/css/output.css --minify",
+    "serve": "python scripts/serve.py"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.0"
+  },
+  "keywords": [
+    "landing-page",
+    "components",
+    "tailwindcss",
+    "html",
+    "django-templates",
+    "funnels"
+  ],
+  "author": "",
+  "license": "MIT"
+}
