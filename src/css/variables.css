@@ -1,46 +1,51 @@
 /**
  * CSS Variables - Claudia Coach Ontologica
- * Tema: Profesional y Minimalista
+ * Tema: teal y ambar de la marca
  */
 
 :root {
-    /* ===== COLORS ===== */
-    
-    /* Primary - Azul Profundo/Navy */
-    --color-primary: #1e3a8a;
-    --color-primary-light: #3b82f6;
-    --color-primary-dark: #1e40af;
-    --color-primary-50: #eff6ff;
-    --color-primary-100: #dbeafe;
-    
-    /* Secondary - Gris */
-    --color-secondary: #64748b;
-    --color-secondary-light: #94a3b8;
-    --color-secondary-dark: #475569;
-    
-    /* Accent - Dorado/Coral */
-    --color-accent: #f59e0b;
-    --color-accent-light: #fbbf24;
-    --color-accent-dark: #d97706;
-    
-    /* Neutral */
-    --color-background: #ffffff;
-    --color-surface: #f8fafc;
-    --color-surface-alt: #f1f5f9;
-    --color-surface-elevated: #ffffff;
-    
-    /* Text */
-    --color-text: #1e293b;
-    --color-text-secondary: #475569;
-    --color-text-muted: #64748b;
-    --color-text-light: #94a3b8;
-    
-    /* Utility */
-    --color-success: #22c55e;
-    --color-error: #ef4444;
-    --color-warning: #f59e0b;
-    --color-info: #3b82f6;
-    
+    /* ===== COLORS =====
+       Stored as space-separated RGB channels so Tailwind can apply alpha
+       (rgb(var(--x) / <alpha-value>)). Brand palette comes from the logo. */
+
+    /* Primary - Teal (500 ~ #00A99D, 700 ~ #00786F) */
+    --color-primary-50: 239 252 250;
+    --color-primary-100: 205 247 242;
+    --color-primary-200: 155 236 228;
+    --color-primary-300: 95 220 209;
+    --color-primary-400: 38 196 185;
+    --color-primary-500: 0 169 157;
+    --color-primary-600: 0 141 131;
+    --color-primary-700: 0 120 111;
+    --color-primary-800: 0 96 90;
+    --color-primary-900: 6 78 73;
+    --color-primary-950: 2 48 46;
+
+    /* Accent - Amber (400 ~ #FBB03B) */
+    --color-accent-50: 255 251 235;
+    --color-accent-100: 254 243 199;
+    --color-accent-200: 253 230 138;
+    --color-accent-300: 252 211 77;
+    --color-accent-400: 251 176 59;
+    --color-accent-500: 245 158 11;
+    --color-accent-600: 217 119 6;
+    --color-accent-700: 180 83 9;
+    --color-accent-800: 146 64 14;
+    --color-accent-900: 120 53 15;
+    --color-accent-950: 69 26 3;
+
+    /* Neutral surfaces (warm off-white) */
+    --color-background: 250 250 247;
+    --color-surface: 255 255 255;
+
+    /* Text (slate) */
+    --color-text: 30 41 59;            /* slate-800 */
+    --color-text-secondary: 71 85 105; /* slate-600 */
+    --color-text-muted: 100 116 139;   /* slate-500 */
+
+    /* Feedback */
+    --color-error: 220 38 38;
+
     /* ===== TYPOGRAPHY ===== */
     
     --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -112,8 +117,7 @@
     
     --border-width: 1px;
     --border-width-2: 2px;
-    --border-color: #e2e8f0;
-    --border-color-dark: #cbd5e1;
+    --border-color: 226 232 240;
     
     /* ===== SHADOWS ===== */
     
@@ -141,53 +145,4 @@
     --z-popover: 1060;
     --z-tooltip: 1070;
     --z-whatsapp: 1080;
-}
-
-/* ===== DARK MODE (Optional) ===== */
-@media (prefers-color-scheme: dark) {
-    :root {
-        --color-background: #0f172a;
-        --color-surface: #1e293b;
-        --color-surface-alt: #334155;
-        --color-text: #f1f5f9;
-        --color-text-muted: #cbd5e1;
-        --color-border-color: #334155;
-    }
-}
-
-/* ===== CUSTOM UTILITY CLASSES ===== */
-
-.container-custom {
-    max-width: var(--container-max-width);
-    margin-left: auto;
-    margin-right: auto;
-    padding-left: var(--container-padding);
-    padding-right: var(--container-padding);
-}
-
-.section-padding {
-    padding-top: var(--spacing-section);
-    padding-bottom: var(--spacing-section);
-}
-
-@media (max-width: 768px) {
-    .section-padding {
-        padding-top: var(--spacing-section-sm);
-        padding-bottom: var(--spacing-section-sm);
-    }
-}
-
-.gradient-primary {
-    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%);
-}
-
-.gradient-accent {
-    background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-light) 100%);
-}
-
-.text-gradient {
-    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
 }

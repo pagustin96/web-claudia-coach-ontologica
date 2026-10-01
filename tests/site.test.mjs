@@ -20,10 +20,13 @@ function localRefs(source) {
   return refs;
 }
 
-// Enabled in T2 (Tailwind build)
-test.todo('does not use the Tailwind CDN');
+test('does not use the Tailwind CDN', () => {
+  assert.ok(!html.includes('cdn.tailwindcss.com'));
+});
 
-test.todo('links the compiled stylesheet');
+test('links the compiled stylesheet', () => {
+  assert.match(html, /<link[^>]+href="assets\/css\/output\.css"/);
+});
 
 test('every local src/href resolves to a file under public/', () => {
   const missing = localRefs(html).filter((ref) => {
@@ -37,4 +40,24 @@ test('every local src/href resolves to a file under public/', () => {
   assert.deepEqual(missing, []);
 });
 
-test.todo('has no inline tailwind.config script');
+test('has no inline tailwind.config script', () => {
+  const inline = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)];
+  assert.ok(!inline.some((m) => m[1].includes('tailwind.config')));
+});
+
+test('build output exists and contains brand components', () => {
+  const cssPath = join(publicDir, 'assets/css/output.css');
+  assert.ok(existsSync(cssPath), 'run `npm run build` first (npm test does it via pretest)');
+  const css = readFileSync(cssPath, 'utf8');
+  for (const needle of ['.btn-primary', '.btn-accent', '.card', '.container-custom', '.bg-primary-900']) {
+    assert.ok(css.includes(needle), `output.css is missing ${needle}`);
+  }
+  assert.ok(!css.includes('#1e3a8a'), 'old navy palette must be gone');
+});
+
+test('every utility/component class used in the HTML is generated', () => {
+  const css = readFileSync(join(publicDir, 'assets/css/output.css'), 'utf8');
+  const probes = ['bg-primary-100', 'text-primary-900', 'hover\\:bg-primary-900', 'to-accent-50', 'text-accent-600', 'bg-white\\/95', 'animate-fade-in', 'animate-slide-up', 'bg-hero-pattern', 'text-gradient'];
+  for (const p of probes) assert.ok(css.includes(p), `output.css is missing .${p}`);
+});
+

@@ -6,6 +6,7 @@
   "scripts": {
     "build": "tailwindcss -i ./src/css/input.css -o ./public/assets/css/output.css --minify",
     "dev": "tailwindcss -i ./src/css/input.css -o ./public/assets/css/output.css --watch",
+    "pretest": "npm run build",
     "test": "node --test tests/*.test.mjs"
   },
   "devDependencies": {
