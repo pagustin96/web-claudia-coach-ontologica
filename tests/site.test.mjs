@@ -45,19 +45,51 @@ test('has no inline tailwind.config script', () => {
   assert.ok(!inline.some((m) => m[1].includes('tailwind.config')));
 });
 
+const css = () => readFileSync(join(publicDir, 'assets/css/output.css'), 'utf8');
+
 test('build output exists and contains brand components', () => {
   const cssPath = join(publicDir, 'assets/css/output.css');
   assert.ok(existsSync(cssPath), 'run `npm run build` first (npm test does it via pretest)');
-  const css = readFileSync(cssPath, 'utf8');
-  for (const needle of ['.btn-primary', '.btn-accent', '.card', '.container-custom', '.bg-primary-900']) {
-    assert.ok(css.includes(needle), `output.css is missing ${needle}`);
+  const out = css();
+  for (const re of [/\.btn-primary[\s{,:]/, /\.btn-accent[\s{,:]/, /\.card[\s{,:]/, /\.container-custom[\s{,:]/, /\.bg-primary-900[\s{,:]/]) {
+    assert.match(out, re, `output.css is missing ${re}`);
   }
-  assert.ok(!css.includes('#1e3a8a'), 'old navy palette must be gone');
+  assert.ok(!out.includes('#1e3a8a'), 'old navy palette must be gone');
 });
 
-test('every utility/component class used in the HTML is generated', () => {
-  const css = readFileSync(join(publicDir, 'assets/css/output.css'), 'utf8');
-  const probes = ['bg-primary-100', 'text-primary-900', 'hover\\:bg-primary-900', 'to-accent-50', 'text-accent-600', 'bg-white\\/95', 'animate-fade-in', 'animate-slide-up', 'bg-hero-pattern', 'text-gradient'];
-  for (const p of probes) assert.ok(css.includes(p), `output.css is missing .${p}`);
+// Classes with no CSS meaning: JS hooks or markers. Keep this list small.
+const NON_STYLING = new Set([
+  'group', // Tailwind marker for group-hover:* variants, emits no rule of its own
+  'peer', // Tailwind marker for peer-* variants
+]);
+
+// Same escaping Tailwind applies to class names inside selectors.
+function escapeSelector(token) {
+  return token.replace(/[^a-zA-Z0-9_-]/g, (c) => '\\' + c);
+}
+
+test('every class used in the HTML is generated as a selector', () => {
+  const out = css();
+  const tokens = new Set();
+  for (const m of html.matchAll(/\bclass\s*=\s*"([^"]*)"/g)) {
+    for (const t of m[1].split(/\s+/).filter(Boolean)) tokens.add(t);
+  }
+  const missing = [...tokens].filter((t) => {
+    if (NON_STYLING.has(t)) return false;
+    const re = new RegExp('\\.' + escapeSelector(t).replace(/[\\^$.*+?()[\]{}|]/g, '\\$&') + '(?![\\w-])');
+    return !re.test(out);
+  });
+  assert.deepEqual(missing, []);
 });
 
+test('vercel.json is valid for the static output', () => {
+  const cfg = JSON.parse(readFileSync(join(root, 'vercel.json'), 'utf8'));
+  assert.equal(cfg.outputDirectory, 'public');
+  const headers = cfg.headers ?? [];
+  for (const h of headers) {
+    assert.ok(!h.source.includes('(?:'), `non-capturing group not supported by path-to-regexp: ${h.source}`);
+  }
+  for (const h of headers.filter((x) => x.source.startsWith('/assets'))) {
+    for (const { value } of h.headers) assert.ok(!/immutable/.test(value), `unhashed assets must not be immutable: ${h.source}`);
+  }
+});

@@ -13,13 +13,13 @@
       ]
     },
     {
-      "source": "/assets/(.*)\\.(?:jpg|jpeg|png|webp|avif|svg|ico)",
+      "source": "/assets/(.*)\\.(jpg|jpeg|png|webp|avif|svg|ico)",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+        { "key": "Cache-Control", "value": "public, max-age=604800, stale-while-revalidate=86400" }
       ]
     },
     {
-      "source": "/assets/(.*)\\.(?:css|js)",
+      "source": "/assets/(.*)\\.(css|js)",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=3600" }
       ]
