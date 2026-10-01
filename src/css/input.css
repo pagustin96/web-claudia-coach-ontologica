@@ -212,6 +212,36 @@
 }
 
 /* ==========================================================================
+   Scroll reveal
+   Content is hidden only when JS is available (html.js, set in <head>) and
+   until main.js marks it with data-revealed. The failsafe animation reveals it
+   anyway after 4s so a script failure can never leave the page blank.
+   ========================================================================== */
+
+.js [data-animate]:not([data-revealed]) {
+  opacity: 0;
+  animation: reveal-failsafe 0.01s 4s forwards;
+}
+
+@keyframes reveal-failsafe {
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .js [data-animate] {
+    opacity: 1 !important;
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ==========================================================================
    Print
    ========================================================================== */
 

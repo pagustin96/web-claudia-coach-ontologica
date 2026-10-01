@@ -1,424 +1,279 @@
 /**
- * Landing Components Library - Main JavaScript
- * Entry point for all interactive components
+ * Main entry point (ES module). Loaded after config.js, which defines
+ * window.SITE_CONFIG.
  *
- * Modules:
- * - carousel.js    : Carousels and sliders
- * - accordion.js   : Collapsible accordions
- * - tabs.js        : Tab navigation
- * - modal.js       : Modal dialogs
- * - countdown.js   : Countdown timers
- * - forms.js       : Form validation and enhancement
- * - mobile-menu.js : Mobile navigation
+ * - applySiteConfig: fills contact links/text from the config
+ * - header, mobile menu, testimonials carousel, scroll reveal
+ * - forms: delegated to forms.js
  *
- * Usage:
- * Include all JS files before closing </body>:
- *   <script src="assets/js/carousel.js"></script>
- *   <script src="assets/js/accordion.js"></script>
- *   <script src="assets/js/tabs.js"></script>
- *   <script src="assets/js/modal.js"></script>
- *   <script src="assets/js/countdown.js"></script>
- *   <script src="assets/js/forms.js"></script>
- *   <script src="assets/js/mobile-menu.js"></script>
- *   <script src="assets/js/main.js"></script>
+ * Nothing touches the DOM at import time, so applySiteConfig can be unit tested.
  */
+import { initForms, whatsappLink } from './forms.js';
 
-(function() {
-    'use strict';
+const FALLBACK_HREF = '#contacto';
+const DEFAULT_WA_TEXT = 'Hola Claudia, quiero más información';
+const BOOKING_WA_TEXT = 'Hola Claudia, quiero agendar mi sesión gratuita';
 
-    // ==========================================================================
-    // Utility Functions
-    // ==========================================================================
+// data-link / data-hide-if-empty keys -> config field.
+const CONFIG_FIELD = {
+  whatsapp: 'whatsappNumber',
+  email: 'email',
+  instagram: 'instagramUrl',
+  facebook: 'facebookUrl',
+  linkedin: 'linkedinUrl',
+};
 
-    /**
-     * Debounce function to limit execution rate
-     */
-    function debounce(func, wait) {
-        let timeout;
-        return function executedFunction(...args) {
-            const later = () => {
-                clearTimeout(timeout);
-                func.apply(this, args);
-            };
-            clearTimeout(timeout);
-            timeout = setTimeout(later, wait);
-        };
+// ============================================================================
+// Config-driven links
+// ============================================================================
+
+function resolveLink(kind, config, el) {
+  switch (kind) {
+    case 'whatsapp':
+      return whatsappLink(config.whatsappNumber, el.dataset.waText || DEFAULT_WA_TEXT);
+    case 'email':
+      return config.email ? `mailto:${config.email}` : null;
+    case 'booking':
+      return config.bookingUrl || whatsappLink(config.whatsappNumber, BOOKING_WA_TEXT);
+    default:
+      return config[CONFIG_FIELD[kind]] || null;
+  }
+}
+
+function resolveText(kind, config) {
+  switch (kind) {
+    case 'email':
+      return config.email || null;
+    case 'whatsapp': {
+      const digits = String(config.whatsappNumber ?? '').replace(/\D/g, '');
+      return digits ? `+${digits}` : null;
     }
-
-    /**
-     * Throttle function to limit execution to once per interval
-     */
-    function throttle(func, limit) {
-        let inThrottle;
-        return function(...args) {
-            if (!inThrottle) {
-                func.apply(this, args);
-                inThrottle = true;
-                setTimeout(() => inThrottle = false, limit);
-            }
-        };
+    case 'instagram': {
+      const handle = String(config.instagramUrl ?? '')
+        .split(/[?#]/)[0]
+        .split('/')
+        .filter(Boolean)
+        .pop();
+      return config.instagramUrl && handle ? `@${handle}` : null;
     }
-
-    // ==========================================================================
-    // Smooth Scroll
-    // ==========================================================================
-
-    function initSmoothScroll() {
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function(e) {
-                const targetId = this.getAttribute('href');
-                if (targetId === '#' || targetId === '#!') return;
-
-                const target = document.querySelector(targetId);
-                if (target) {
-                    e.preventDefault();
-                    target.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'start'
-                    });
-
-                    // Update URL without scroll
-                    history.pushState(null, null, targetId);
-                }
-            });
-        });
-    }
-
-    // ==========================================================================
-    // Sticky Header
-    // ==========================================================================
-
-    function initStickyHeader() {
-        const header = document.querySelector('[data-sticky-header]');
-        if (!header) return;
-
-        const threshold = parseInt(header.getAttribute('data-sticky-threshold') || '100');
-
-        function handleScroll() {
-            if (window.scrollY > threshold) {
-                header.classList.add('scrolled');
-            } else {
-                header.classList.remove('scrolled');
-            }
-        }
-
-        window.addEventListener('scroll', throttle(handleScroll, 100), { passive: true });
-        handleScroll();
-    }
-
-    // ==========================================================================
-    // Dropdown Menus
-    // ==========================================================================
-
-    function initDropdowns() {
-        const dropdowns = document.querySelectorAll('[data-dropdown]');
-
-        dropdowns.forEach(dropdown => {
-            const trigger = dropdown.querySelector('[data-dropdown-trigger]');
-            const menu = dropdown.querySelector('[data-dropdown-menu]');
-
-            if (!trigger || !menu) return;
-
-            trigger.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const isOpen = menu.classList.contains('open');
-
-                // Close all other dropdowns
-                document.querySelectorAll('[data-dropdown-menu].open').forEach(m => {
-                    if (m !== menu) m.classList.remove('open');
-                });
-
-                menu.classList.toggle('open', !isOpen);
-                trigger.setAttribute('aria-expanded', !isOpen);
-            });
-
-            // Keyboard support
-            trigger.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    trigger.click();
-                }
-            });
-        });
-
-        // Close dropdowns when clicking outside
-        document.addEventListener('click', () => {
-            document.querySelectorAll('[data-dropdown-menu].open').forEach(menu => {
-                menu.classList.remove('open');
-            });
-        });
-
-        // Close on escape
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                document.querySelectorAll('[data-dropdown-menu].open').forEach(menu => {
-                    menu.classList.remove('open');
-                });
-            }
-        });
-    }
-
-    // ==========================================================================
-    // Copy to Clipboard
-    // ==========================================================================
-
-    function initCopyToClipboard() {
-        document.querySelectorAll('[data-copy]').forEach(button => {
-            button.addEventListener('click', async () => {
-                const text = button.getAttribute('data-copy');
-                const targetId = button.getAttribute('data-copy-target');
-                const copyText = targetId ?
-                    document.getElementById(targetId)?.value || document.getElementById(targetId)?.textContent :
-                    text;
-
-                if (!copyText) return;
-
-                try {
-                    await navigator.clipboard.writeText(copyText);
-
-                    const originalText = button.textContent;
-                    const originalHtml = button.innerHTML;
-
-                    button.textContent = 'Copied!';
-                    button.classList.add('copied');
-
-                    setTimeout(() => {
-                        button.innerHTML = originalHtml;
-                        button.classList.remove('copied');
-                    }, 2000);
-                } catch (err) {
-                    console.error('Failed to copy:', err);
-                }
-            });
-        });
-    }
-
-    // ==========================================================================
-    // Toast Notifications
-    // ==========================================================================
-
-    window.showToast = function(message, type = 'info', duration = 3000) {
-        let container = document.getElementById('toast-container');
-
-        if (!container) {
-            container = document.createElement('div');
-            container.id = 'toast-container';
-            container.className = 'fixed bottom-4 right-4 z-50 flex flex-col gap-2';
-            document.body.appendChild(container);
-        }
-
-        const toast = document.createElement('div');
-        toast.className = 'px-4 py-3 rounded-lg shadow-lg text-white transform translate-x-full transition-transform duration-300';
-
-        const bgColors = {
-            info: 'bg-blue-500',
-            success: 'bg-green-500',
-            warning: 'bg-yellow-500',
-            error: 'bg-red-500'
-        };
-
-        toast.classList.add(bgColors[type] || bgColors.info);
-        toast.textContent = message;
-
-        container.appendChild(toast);
-
-        // Animate in
-        requestAnimationFrame(() => {
-            toast.classList.remove('translate-x-full');
-            toast.classList.add('translate-x-0');
-        });
-
-        // Animate out and remove
-        setTimeout(() => {
-            toast.classList.remove('translate-x-0');
-            toast.classList.add('translate-x-full', 'opacity-0');
-            setTimeout(() => toast.remove(), 300);
-        }, duration);
-    };
-
-    // ==========================================================================
-    // Scroll Animations (Intersection Observer)
-    // ==========================================================================
-
-    function initScrollAnimations() {
-        const animatedElements = document.querySelectorAll('[data-animate]');
-
-        if (animatedElements.length === 0) return;
-
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    const animation = entry.target.getAttribute('data-animate');
-                    const delay = entry.target.getAttribute('data-animate-delay') || '0';
-
-                    setTimeout(() => {
-                        entry.target.classList.add(`animate-${animation}`);
-                        entry.target.style.opacity = '1';
-                    }, parseInt(delay));
-
-                    observer.unobserve(entry.target);
-                }
-            });
-        }, {
-            threshold: 0.1,
-            rootMargin: '0px 0px -50px 0px'
-        });
-
-        animatedElements.forEach(el => {
-            el.style.opacity = '0';
-            observer.observe(el);
-        });
-    }
-
-    // ==========================================================================
-    // Lazy Loading Images
-    // ==========================================================================
-
-    function initLazyLoading() {
-        const lazyImages = document.querySelectorAll('[data-lazy-src]');
-
-        if (lazyImages.length === 0) return;
-
-        if ('IntersectionObserver' in window) {
-            const imageObserver = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        const img = entry.target;
-                        img.src = img.getAttribute('data-lazy-src');
-                        img.removeAttribute('data-lazy-src');
-                        img.classList.add('loaded');
-                        imageObserver.unobserve(img);
-                    }
-                });
-            }, {
-                rootMargin: '50px 0px'
-            });
-
-            lazyImages.forEach(img => imageObserver.observe(img));
-        } else {
-            // Fallback for older browsers
-            lazyImages.forEach(img => {
-                img.src = img.getAttribute('data-lazy-src');
-            });
-        }
-    }
-
-    // ==========================================================================
-    // Back to Top Button
-    // ==========================================================================
-
-    function initBackToTop() {
-        const button = document.querySelector('[data-back-to-top]');
-        if (!button) return;
-
-        const threshold = parseInt(button.getAttribute('data-show-at') || '300');
-
-        function handleScroll() {
-            if (window.scrollY > threshold) {
-                button.classList.add('visible');
-                button.classList.remove('hidden');
-            } else {
-                button.classList.remove('visible');
-                button.classList.add('hidden');
-            }
-        }
-
-        button.addEventListener('click', () => {
-            window.scrollTo({
-                top: 0,
-                behavior: 'smooth'
-            });
-        });
-
-        window.addEventListener('scroll', throttle(handleScroll, 100), { passive: true });
-        handleScroll();
-    }
-
-    // ==========================================================================
-    // Video Play Button
-    // ==========================================================================
-
-    function initVideoPlayButtons() {
-        document.querySelectorAll('[data-video-play]').forEach(button => {
-            button.addEventListener('click', () => {
-                const videoId = button.getAttribute('data-video-play');
-                const video = document.getElementById(videoId);
-
-                if (video) {
-                    if (video.paused) {
-                        video.play();
-                        button.classList.add('playing');
-                    } else {
-                        video.pause();
-                        button.classList.remove('playing');
-                    }
-                }
-            });
-        });
-    }
-
-    // ==========================================================================
-    // Initialize All Components
-    // ==========================================================================
-
-    function init() {
-        // Core functionality
-        initSmoothScroll();
-        initStickyHeader();
-        initDropdowns();
-        initCopyToClipboard();
-        initScrollAnimations();
-        initLazyLoading();
-        initBackToTop();
-        initVideoPlayButtons();
-
-        // Initialize module components if loaded
-        // These will auto-init if their scripts are included,
-        // but we call them here for manual initialization
-        if (typeof window.initCarousels === 'function') {
-            window.initCarousels();
-        }
-        if (typeof window.initAccordions === 'function') {
-            window.initAccordions();
-        }
-        if (typeof window.initTabs === 'function') {
-            window.initTabs();
-        }
-        if (typeof window.initModals === 'function') {
-            window.initModals();
-        }
-        if (typeof window.initCountdowns === 'function') {
-            window.initCountdowns();
-        }
-        if (typeof window.initForms === 'function') {
-            window.initForms();
-        }
-        if (typeof window.initMobileMenus === 'function') {
-            window.initMobileMenus();
-        }
-
-        console.log('Landing Components Library initialized');
-    }
-
-    // ==========================================================================
-    // Export Utilities
-    // ==========================================================================
-
-    window.LCL = {
-        debounce,
-        throttle,
-        showToast: window.showToast,
-        init
-    };
-
-    // ==========================================================================
-    // Run Initialization
-    // ==========================================================================
-
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
+    default:
+      return null;
+  }
+}
+
+function isConfigured(key, config) {
+  if (key === 'booking') return Boolean(config.bookingUrl || config.whatsappNumber);
+  return Boolean(config[CONFIG_FIELD[key]]);
+}
+
+function hide(el) {
+  el.hidden = true;
+  el.style.display = 'none';
+}
+
+export function applySiteConfig(config = {}, root = document) {
+  for (const el of root.querySelectorAll('[data-link]')) {
+    const href = resolveLink(el.dataset.link, config, el) || FALLBACK_HREF;
+    el.setAttribute('href', href);
+    if (/^https?:/.test(href)) {
+      el.setAttribute('target', '_blank');
+      el.setAttribute('rel', 'noopener noreferrer');
     } else {
-        init();
+      el.removeAttribute('target');
+      el.removeAttribute('rel');
     }
+  }
 
-})();
+  for (const el of root.querySelectorAll('[data-config-text]')) {
+    const value = resolveText(el.dataset.configText, config);
+    if (value) el.textContent = value;
+  }
+
+  for (const el of root.querySelectorAll('[data-hide-if-empty]')) {
+    const key = el.dataset.hideIfEmpty || el.dataset.link;
+    if (key && !isConfigured(key, config)) hide(el);
+  }
+
+  if (!config.showTestimonials) {
+    for (const el of root.querySelectorAll('#testimonios, [href="#testimonios"]')) hide(el);
+  }
+}
+
+// ============================================================================
+// Header: shadow once the page is scrolled
+// ============================================================================
+
+function initHeader() {
+  const header = document.querySelector('[data-sticky-header]');
+  if (!header) return;
+  const threshold = Number(header.dataset.stickyThreshold) || 50;
+  let ticking = false;
+
+  const update = () => {
+    const scrolled = window.scrollY > threshold;
+    header.classList.toggle('shadow-md', scrolled);
+    header.classList.toggle('bg-white', scrolled);
+    header.classList.toggle('bg-white/95', !scrolled);
+    ticking = false;
+  };
+
+  window.addEventListener(
+    'scroll',
+    () => {
+      if (!ticking) {
+        ticking = true;
+        requestAnimationFrame(update);
+      }
+    },
+    { passive: true }
+  );
+  update();
+}
+
+// ============================================================================
+// Mobile menu
+// ============================================================================
+
+function initMobileMenu() {
+  const button = document.getElementById('mobile-menu-button');
+  const menu = document.getElementById('mobile-menu');
+  if (!button || !menu) return;
+
+  const setOpen = (open) => {
+    menu.classList.toggle('hidden', !open);
+    button.setAttribute('aria-expanded', String(open));
+  };
+
+  button.addEventListener('click', () => setOpen(menu.classList.contains('hidden')));
+  menu.querySelectorAll('a').forEach((link) => link.addEventListener('click', () => setOpen(false)));
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !menu.classList.contains('hidden')) {
+      setOpen(false);
+      button.focus();
+    }
+  });
+}
+
+// ============================================================================
+// Testimonials carousel
+// ============================================================================
+
+const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function visibleSlides() {
+  if (window.innerWidth >= 1024) return 3;
+  if (window.innerWidth >= 768) return 2;
+  return 1;
+}
+
+function initCarousel() {
+  const track = document.getElementById('testimonials-track');
+  const prev = document.getElementById('carousel-prev');
+  const next = document.getElementById('carousel-next');
+  const container = track?.closest('[data-carousel]');
+  if (!track || !prev || !next || !container) return;
+
+  const total = track.children.length;
+  const interval = Number(container.dataset.carouselInterval) || 5000;
+  const autoplayWanted = container.dataset.carouselAutoplay === 'true' && !reducedMotion();
+  let index = 0;
+  let timer = null;
+
+  const maxIndex = () => Math.max(0, total - visibleSlides());
+  const render = () => {
+    index = Math.min(index, maxIndex());
+    track.style.transform = `translateX(-${(index * 100) / visibleSlides()}%)`;
+  };
+  const stop = () => {
+    clearInterval(timer);
+    timer = null;
+    track.setAttribute('aria-live', 'polite');
+  };
+  const start = () => {
+    if (!autoplayWanted || timer) return;
+    track.setAttribute('aria-live', 'off');
+    timer = setInterval(() => {
+      index = index >= maxIndex() ? 0 : index + 1;
+      render();
+    }, interval);
+  };
+
+  prev.addEventListener('click', () => {
+    index = Math.max(0, index - 1);
+    render();
+  });
+  next.addEventListener('click', () => {
+    index = Math.min(maxIndex(), index + 1);
+    render();
+  });
+  window.addEventListener('resize', render);
+
+  // Pause while the user hovers or focuses anything inside the carousel.
+  container.addEventListener('mouseenter', stop);
+  container.addEventListener('mouseleave', start);
+  container.addEventListener('focusin', stop);
+  container.addEventListener('focusout', (e) => {
+    if (!container.contains(e.relatedTarget)) start();
+  });
+
+  render();
+  start();
+}
+
+// ============================================================================
+// Scroll reveal
+// ============================================================================
+
+// CSS hides `.js [data-animate]:not([data-revealed])`; setting the attribute shows it.
+const reveal = (el) => el.setAttribute('data-revealed', '');
+
+function initScrollReveal() {
+  const items = document.querySelectorAll('[data-animate]');
+  if (!items.length) return;
+
+  if (reducedMotion() || !('IntersectionObserver' in window)) {
+    items.forEach(reveal);
+    return;
+  }
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        const el = entry.target;
+        observer.unobserve(el);
+        setTimeout(() => {
+          reveal(el);
+          el.classList.add(`animate-${el.dataset.animate}`);
+        }, Number(el.dataset.animateDelay) || 0);
+      }
+    },
+    { threshold: 0.1, rootMargin: '0px 0px -50px 0px' }
+  );
+  items.forEach((el) => observer.observe(el));
+}
+
+// ============================================================================
+// Init
+// ============================================================================
+
+function init() {
+  const config = globalThis.SITE_CONFIG ?? {};
+  // Each step is isolated so one failure cannot stop the rest (or leave content hidden).
+  for (const step of [
+    () => applySiteConfig(config, document),
+    initHeader,
+    initMobileMenu,
+    initCarousel,
+    initScrollReveal,
+    () => initForms(document, config),
+  ]) {
+    try {
+      step();
+    } catch (error) {
+      console.error(error);
+    }
+  }
+}
+
+if (typeof document !== 'undefined') init();

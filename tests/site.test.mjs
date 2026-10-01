@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -92,4 +92,102 @@ test('vercel.json is valid for the static output', () => {
   for (const h of headers.filter((x) => x.source.startsWith('/assets'))) {
     for (const { value } of h.headers) assert.ok(!/immutable/.test(value), `unhashed assets must not be immutable: ${h.source}`);
   }
+});
+
+// --- T4: scripts, config-driven data and forms -------------------------------
+
+test('public/ contains none of the fake contact literals', () => {
+  const TEXT = /\.(html|js|mjs|css|json|txt|xml|webmanifest)$/i;
+  const FAKE = [/1234567890/, /claudiacoach\.com/, /\+123 456/];
+  const hits = [];
+  const walk = (dir) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (TEXT.test(e.name)) {
+        const text = readFileSync(p, 'utf8');
+        for (const re of FAKE) if (re.test(text)) hits.push(`${p}: ${re}`);
+      }
+    }
+  };
+  walk(publicDir);
+  assert.deepEqual(hits, []);
+});
+
+test('the only inline script is the js-class marker in <head>', () => {
+  const inline = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)];
+  assert.equal(inline.length, 1, 'exactly one inline script expected');
+  assert.equal(inline[0][1].trim(), "document.documentElement.classList.add('js')");
+  const head = html.slice(html.indexOf('<head'), html.indexOf('</head>'));
+  assert.ok(head.includes(inline[0][0]), 'the js-class script must be in <head>');
+});
+
+test('config.js loads as a classic script and main.js as a module, at the end of <body>', () => {
+  const config = html.indexOf('<script src="assets/js/config.js"></script>');
+  const main = html.indexOf('<script type="module" src="assets/js/main.js"></script>');
+  assert.ok(config > -1, 'config.js script tag missing');
+  assert.ok(main > -1, 'main.js module script tag missing');
+  assert.ok(config < main, 'config.js must come before main.js');
+  assert.ok(config > html.indexOf('</main>'), 'scripts belong at the end of <body>');
+});
+
+test('contact and lead forms are wired for Web3Forms', () => {
+  for (const kind of ['contact', 'lead']) {
+    const form = html.match(new RegExp(`<form\\b[^>]*data-form="${kind}"[^>]*>[\\s\\S]*?</form>`))?.[0];
+    assert.ok(form, `form[data-form="${kind}"] not found`);
+    const open = form.match(/<form\b[^>]*>/)[0];
+    assert.match(open, /\bnovalidate\b/);
+    assert.match(open, /method="POST"/i);
+    assert.match(open, /action="https:\/\/api\.web3forms\.com\/submit"/);
+    assert.match(form, /<input[^>]*type="hidden"[^>]*name="access_key"/);
+    const honeypot = form.match(/<input[^>]*name="botcheck"[^>]*>/)?.[0];
+    assert.ok(honeypot, 'honeypot missing');
+    assert.match(honeypot, /type="checkbox"/);
+    assert.match(honeypot, /class="hidden"/);
+    assert.match(honeypot, /tabindex="-1"/);
+    assert.match(honeypot, /autocomplete="off"/);
+    for (const name of ['name', 'email']) assert.match(form, new RegExp(`name="${name}"`));
+  }
+});
+
+test('contact form has the extra fields and a consultType select', () => {
+  const form = html.match(/<form\b[^>]*data-form="contact"[^>]*>[\s\S]*?<\/form>/)[0];
+  for (const name of ['phone', 'message', 'privacy']) assert.match(form, new RegExp(`name="${name}"`));
+  const select = form.match(/<select\b[^>]*name="consultType"[^>]*>[\s\S]*?<\/select>/)?.[0];
+  assert.ok(select, 'select[name=consultType] missing');
+  const values = [...select.matchAll(/<option\b[^>]*value="([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(values, ['personal', 'empresa', 'charla']);
+  assert.match(form, /<label[^>]*for="contact-type"/);
+});
+
+test('contact links are config-driven, not hard-coded', () => {
+  assert.ok(!/href="https?:\/\/(wa\.me|(www\.)?(instagram|facebook|linkedin)\.com)/i.test(html), 'hard-coded contact URL found');
+  assert.ok(!/href="mailto:/i.test(html), 'hard-coded mailto found');
+  for (const m of html.matchAll(/<a\b[^>]*aria-label="(Instagram|LinkedIn|Facebook)"[^>]*>/g)) {
+    assert.match(m[0], /data-link="/, m[0]);
+  }
+  for (const kind of ['whatsapp', 'email', 'instagram', 'facebook', 'linkedin']) {
+    assert.match(html, new RegExp(`data-link="${kind}"`), `no data-link="${kind}" in the page`);
+  }
+  assert.match(html, /data-config-text="email"/);
+  assert.match(html, /data-hide-if-empty/);
+});
+
+test('carousel is accessible: labelled controls and described slides', () => {
+  assert.match(html, /<button[^>]*id="carousel-prev"[^>]*aria-label="[^"]+"/);
+  assert.match(html, /<button[^>]*id="carousel-next"[^>]*aria-label="[^"]+"/);
+  const track = html.match(/<div[^>]*id="testimonials-track"[^>]*>/)?.[0];
+  assert.ok(track);
+  const slides = html.match(/aria-roledescription="slide"/g) ?? [];
+  assert.equal(slides.length, 5);
+  assert.match(html, /aria-roledescription="carousel"/);
+});
+
+test('animated content is only hidden when JS is available, and reduced motion is honoured', () => {
+  const out = css();
+  assert.match(out, /\.js \[data-animate\]/, 'hide rule must be scoped to html.js');
+  for (const m of out.matchAll(/(.{0,4})\[data-animate\]/g)) {
+    assert.equal(m[1], '.js ', 'unscoped [data-animate] rule would hide content without JS');
+  }
+  assert.match(out, /prefers-reduced-motion:\s*reduce/);
 });
