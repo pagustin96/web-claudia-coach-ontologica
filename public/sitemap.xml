@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- TODO: replace base URL when the final domain is set (also index.html, robots.txt, privacidad.html) -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://claudia-samudio.vercel.app/</loc>
+    <lastmod>2026-10-01</lastmod>
+  </url>
+  <url>
+    <loc>https://claudia-samudio.vercel.app/privacidad</loc>
+    <lastmod>2026-10-01</lastmod>
+  </url>
+</urlset>

@@ -185,12 +185,14 @@ test('no anchor points to a bare "#"', () => {
   assert.ok(!/href="#"/.test(html));
 });
 
-test('the privacy links point to privacidad.html (the page itself arrives in T6)', () => {
+test('the privacy links point to privacidad.html', () => {
   const links = [...live.matchAll(/<a\b[^>]*href="privacidad\.html"[^>]*>/g)];
   assert.ok(links.length >= 2, 'form checkbox and footer');
 });
 
-test.todo('privacidad.html exists (created in T6)');
+test('privacidad.html exists', () => {
+  assert.ok(existsSync(join(root, 'public', 'privacidad.html')));
+});
 
 // --- Navigation ------------------------------------------------------------------
 

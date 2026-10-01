@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { applySiteConfig, initConsultTypeLinks, selectConsultType, playReveal, revealRemaining, REVEAL_FAILSAFE_MS } from '../public/assets/js/main.js';
+import { initForms } from '../public/assets/js/forms.js';
 import { FakeElement, createDocument } from './helpers/fake-dom.mjs';
 
 // Tiny DOM stand-in: just enough for the selectors applySiteConfig uses.
@@ -263,4 +264,24 @@ test('the JS failsafe fires before the CSS one, which only covers a dead script'
   const cssDelay = Number(css.match(/animation:\s*reveal-failsafe\s+[\d.]+s\s+([\d.]+)s/)?.[1]);
   assert.ok(Number.isFinite(cssDelay), 'CSS failsafe animation not found');
   assert.ok(cssDelay * 1000 > REVEAL_FAILSAFE_MS, `CSS failsafe (${cssDelay}s) must come after the JS one (${REVEAL_FAILSAFE_MS}ms)`);
+});
+
+test('pages without the landing sections (privacidad, 404) do not break the init steps', () => {
+  const empty = fakeRoot([]);
+  assert.doesNotThrow(() => applySiteConfig({ ...EMPTY, showTestimonials: true }, empty));
+  assert.doesNotThrow(() => initConsultTypeLinks(empty));
+  assert.doesNotThrow(() => initForms(empty, EMPTY));
+});
+
+test('the privacy email link and its wrapper are hidden until an email is configured', () => {
+  const wrapper = el({ dataset: { hideIfEmpty: 'email' } });
+  const link = el({ href: '/#contacto', dataset: { link: 'email', configText: 'email' } });
+  applySiteConfig(EMPTY, fakeRoot([wrapper, link]));
+  assert.equal(wrapper.hidden, true);
+  const wrapper2 = el({ dataset: { hideIfEmpty: 'email' } });
+  const link2 = el({ href: '/#contacto', dataset: { link: 'email', configText: 'email' } });
+  applySiteConfig({ ...EMPTY, email: 'hola@example.com' }, fakeRoot([wrapper2, link2]));
+  assert.equal(wrapper2.hidden, false);
+  assert.equal(link2.getAttribute('href'), 'mailto:hola@example.com');
+  assert.equal(link2.textContent, 'hola@example.com');
 });

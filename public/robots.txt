@@ -1,0 +1,5 @@
+# TODO: replace base URL when the final domain is set (also index.html, sitemap.xml, privacidad.html)
+User-agent: *
+Allow: /
+
+Sitemap: https://claudia-samudio.vercel.app/sitemap.xml

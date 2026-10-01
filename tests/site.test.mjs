@@ -7,6 +7,9 @@ import { fileURLToPath } from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const publicDir = join(root, 'public');
 const html = readFileSync(join(publicDir, 'index.html'), 'utf8');
+// Every standalone page is held to the same asset and class checks.
+const PAGES = ['index.html', 'privacidad.html', '404.html'];
+const pageSource = (name) => readFileSync(join(publicDir, name), 'utf8');
 
 const EXTERNAL = /^(https?:|\/\/|mailto:|tel:|#|data:|javascript:)/i;
 
@@ -29,16 +32,17 @@ test('links the compiled stylesheet', () => {
 });
 
 test('every local src/href resolves to a file under public/', () => {
-  const missing = localRefs(html).filter((ref) => {
-    const clean = ref.split('#')[0].split('?')[0];
-    if (!clean) return false;
-    // T6 creates the privacy page; content.test.mjs tracks it with test.todo.
-    if (clean === 'privacidad.html') return false;
-    const target = clean.startsWith('/')
-      ? join(publicDir, clean)
-      : join(publicDir, decodeURIComponent(clean));
-    return !existsSync(target);
-  });
+  const missing = [];
+  for (const page of PAGES) {
+    for (const ref of localRefs(pageSource(page))) {
+      const clean = ref.split('#')[0].split('?')[0];
+      if (!clean) continue;
+      const target = join(publicDir, decodeURIComponent(clean));
+      // cleanUrls: "/" is index.html and "/privacidad" is privacidad.html.
+      const found = clean === '/' ? existsSync(join(publicDir, 'index.html')) : existsSync(target) || existsSync(target + '.html');
+      if (!found) missing.push(`${page}: ${ref}`);
+    }
+  }
   assert.deepEqual(missing, []);
 });
 
@@ -73,8 +77,10 @@ function escapeSelector(token) {
 test('every class used in the HTML is generated as a selector', () => {
   const out = css();
   const tokens = new Set();
-  for (const m of html.matchAll(/\bclass\s*=\s*"([^"]*)"/g)) {
-    for (const t of m[1].split(/\s+/).filter(Boolean)) tokens.add(t);
+  for (const page of PAGES) {
+    for (const m of pageSource(page).matchAll(/\bclass\s*=\s*"([^"]*)"/g)) {
+      for (const t of m[1].split(/\s+/).filter(Boolean)) tokens.add(t);
+    }
   }
   const missing = [...tokens].filter((t) => {
     if (NON_STYLING.has(t)) return false;
@@ -116,12 +122,22 @@ test('public/ contains none of the fake contact literals', () => {
   assert.deepEqual(hits, []);
 });
 
-test('the only inline script is the js-class marker in <head>', () => {
-  const inline = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)];
-  assert.equal(inline.length, 1, 'exactly one inline script expected');
+const JSON_LD = /type="application\/ld\+json"/;
+
+test('the only inline script is the js-class marker in <head> (JSON-LD data blocks aside)', () => {
+  const inline = [...html.matchAll(/<script(?![^>]*\bsrc=)([^>]*)>([\s\S]*?)<\/script>/gi)]
+    .filter((m) => !JSON_LD.test(m[1]))
+    .map((m) => [m[0], m[2]]);
+  assert.equal(inline.length, 1, 'exactly one executable inline script expected');
   assert.equal(inline[0][1].trim(), "document.documentElement.classList.add('js')");
   const head = html.slice(html.indexOf('<head'), html.indexOf('</head>'));
   assert.ok(head.includes(inline[0][0]), 'the js-class script must be in <head>');
+});
+
+test('every JSON-LD block parses as JSON with an @context', () => {
+  const blocks = [...html.matchAll(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi)];
+  assert.ok(blocks.length >= 1, 'expected at least one JSON-LD block');
+  for (const [, body] of blocks) assert.ok(JSON.parse(body)['@context']);
 });
 
 test('config.js loads as a classic script and main.js as a module, at the end of <body>', () => {
