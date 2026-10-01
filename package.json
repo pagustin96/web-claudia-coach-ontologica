@@ -1,23 +1,20 @@
 {
-  "name": "landing-components-library",
+  "name": "claudia-samudio-landing",
   "version": "1.0.0",
-  "description": "Biblioteca de componentes HTML reutilizables para landing pages, servicios y funnels de ventas",
+  "private": true,
+  "description": "Landing page de Claudia Viviana Samudio, Coach Ontologica",
   "scripts": {
-    "build": "tailwindcss -i ./assets/css/input.css -o ./assets/css/output.css",
-    "watch": "tailwindcss -i ./assets/css/input.css -o ./assets/css/output.css --watch",
-    "build:prod": "tailwindcss -i ./assets/css/input.css -o ./assets/css/output.css --minify",
-    "serve": "python scripts/serve.py"
+    "build": "tailwindcss -i ./src/css/input.css -o ./public/assets/css/output.css --minify",
+    "dev": "tailwindcss -i ./src/css/input.css -o ./public/assets/css/output.css --watch",
+    "test": "node --test tests/*.test.mjs"
   },
   "devDependencies": {
     "tailwindcss": "^3.4.0"
   },
   "keywords": [
     "landing-page",
-    "components",
     "tailwindcss",
-    "html",
-    "django-templates",
-    "funnels"
+    "html"
   ],
   "author": "",
   "license": "MIT"
