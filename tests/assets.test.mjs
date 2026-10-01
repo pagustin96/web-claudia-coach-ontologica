@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
+import { imageSize } from './helpers/image-size.mjs';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -55,6 +56,24 @@ test('every <img> declares width, height and alt', () => {
     assert.match(m[0], /\bheight="\d+"/, m[0]);
     assert.match(m[0], /\balt="[^"]+"/, m[0]);
   }
+});
+
+test('every local <img> width/height match the real pixel size', () => {
+  const mismatches = [];
+  let checked = 0;
+  for (const m of html.matchAll(/<img\b[^>]*>/g)) {
+    const src = m[0].match(/\bsrc="([^"]+)"/)?.[1];
+    if (!src || /^(https?:|\/\/|data:)/i.test(src)) continue;
+    const width = Number(m[0].match(/\bwidth="(\d+)"/)?.[1]);
+    const height = Number(m[0].match(/\bheight="(\d+)"/)?.[1]);
+    const real = imageSize(readFileSync(join(publicDir, src)));
+    checked++;
+    if (real.width !== width || real.height !== height) {
+      mismatches.push(`${src}: html ${width}x${height}, file ${real.width}x${real.height}`);
+    }
+  }
+  assert.ok(checked > 0, 'no local <img> checked');
+  assert.deepEqual(mismatches, []);
 });
 
 test('public/ has no file larger than 500 KB', () => {

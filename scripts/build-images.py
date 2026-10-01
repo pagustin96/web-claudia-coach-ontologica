@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build the logo variants, favicon set, web manifest and OG image.
 
-Idempotent and Pillow-only. Source: assets-src/logo-source.jpeg.
+Pillow-only and deterministic on hosts with the same fonts. Source: assets-src/logo-source.jpeg.
 Run from the repo root: python3 scripts/build-images.py
 """
 import json
@@ -22,8 +22,21 @@ OFF_WHITE = (252, 249, 243)
 BG_THRESHOLD = 12       # ink strength (0-255) below which a pixel is background
 LOGO_HEIGHT = 160       # retina-friendly for a ~56-64px header
 
+# Open Graph card layout (1200x630 is the size social networks expect)
+OG_SIZE = (1200, 630)
+OG_LOGO_WIDTH = 840
+OG_TEXT_MAX_WIDTH = 1040
+OG_TEXT_GAP = 48        # vertical space between logo and tagline
+OG_FONT_SIZE = 34
+OG_FONT_MIN_SIZE = 16
+FONT_CANDIDATES = (
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    "/usr/share/fonts/truetype/ubuntu/UbuntuSans[wdth,wght].ttf",
+)
+
 
 def ink_strength(px):
+    """Distance of a pixel from white (0-255): how much ink it carries."""
     return 255 - min(px)
 
 
@@ -39,12 +52,12 @@ def to_transparent(img):
     for y in range(rgb.height):
         for x in range(rgb.width):
             r, g, b = src[x, y]
-            s = 255 - min(r, g, b)
+            s = ink_strength((r, g, b))
             if s < BG_THRESHOLD:
                 dst[x, y] = (0, 0, 0, 0)
                 continue
             fg = AMBER if r > b else TEAL
-            fg_strength = 255 - min(fg)
+            fg_strength = ink_strength(fg)
             alpha = min(1.0, s / fg_strength)
             dst[x, y] = (*fg, round(alpha * 255))
     return out
@@ -75,6 +88,8 @@ def split_mark(logo):
     """Return the figure above the script: the first empty row band after the top ink."""
     alpha = logo.getchannel("A").point(lambda a: 255 if a > 8 else 0)
     inked = [alpha.crop((0, y, logo.width, y + 1)).getbbox() is not None for y in range(logo.height)]
+    if True not in inked:
+        raise ValueError("split_mark: image has no ink (fully transparent), cannot find the figure")
     top = inked.index(True)
     gap = next((y for y in range(top, logo.height) if not inked[y]), None)
     if gap is None:
@@ -98,30 +113,32 @@ def primary_hex():
 
 
 def load_font(size):
-    for path in (
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/truetype/ubuntu/UbuntuSans[wdth,wght].ttf",
-    ):
+    for path in FONT_CANDIDATES:
         if Path(path).exists():
             return ImageFont.truetype(path, size)
-    return ImageFont.load_default()
+    raise FileNotFoundError(
+        "No TrueType font found for the OG image. Install one of: " + ", ".join(FONT_CANDIDATES)
+    )
 
 
-def build_og(logo_full, teal_dark):
-    og = Image.new("RGB", (1200, 630), OFF_WHITE)
-    logo = logo_full.resize((840, round(logo_full.height * 840 / logo_full.width)), Image.LANCZOS)
+def build_og(logo_full, primary_rgb):
+    width, height = OG_SIZE
+    og = Image.new("RGB", OG_SIZE, OFF_WHITE)
+    logo = logo_full.resize(
+        (OG_LOGO_WIDTH, round(logo_full.height * OG_LOGO_WIDTH / logo_full.width)), Image.LANCZOS
+    )
     text = "Coach Ontológica · Salud, Bienestar y Nutrición Consciente"
-    size = 34
+    size = OG_FONT_SIZE
     font = load_font(size)
     draw = ImageDraw.Draw(og)
-    while draw.textlength(text, font=font) > 1040 and size > 16:
+    while draw.textlength(text, font=font) > OG_TEXT_MAX_WIDTH and size > OG_FONT_MIN_SIZE:
         size -= 1
         font = load_font(size)
     text_w = draw.textlength(text, font=font)
-    block = logo.height + 48 + size
-    top = (630 - block) // 2
-    og.paste(logo, ((1200 - logo.width) // 2, top), logo)
-    draw.text(((1200 - text_w) / 2, top + logo.height + 48), text, font=font, fill=teal_dark)
+    block = logo.height + OG_TEXT_GAP + size
+    top = (height - block) // 2
+    og.paste(logo, ((width - logo.width) // 2, top), logo)
+    draw.text(((width - text_w) / 2, top + logo.height + OG_TEXT_GAP), text, font=font, fill=primary_rgb)
     og.save(PUBLIC / "og-image.jpg", "JPEG", quality=88, optimize=True, progressive=True)
 
 
@@ -146,7 +163,7 @@ def main():
     on_square(mark, 192, bg=WHITE, fill=0.62).convert("RGB").save(PUBLIC / "icon-192.png", optimize=True)
     on_square(mark, 512, bg=WHITE, fill=0.62).convert("RGB").save(PUBLIC / "icon-512.png", optimize=True)
 
-    teal_rgb, teal_hex = primary_hex()
+    primary_rgb, primary_hex_value = primary_hex()
     manifest = {
         "name": "Claudia Viviana Samudio",
         "short_name": "Claudia Samudio",
@@ -154,7 +171,7 @@ def main():
         "lang": "es",
         "start_url": "/",
         "display": "standalone",
-        "theme_color": teal_hex,
+        "theme_color": primary_hex_value,
         "background_color": "#ffffff",
         "icons": [
             {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png"},
@@ -163,7 +180,7 @@ def main():
     }
     (PUBLIC / "site.webmanifest").write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n")
 
-    build_og(full, teal_rgb)
+    build_og(full, primary_rgb)
 
 
 if __name__ == "__main__":
