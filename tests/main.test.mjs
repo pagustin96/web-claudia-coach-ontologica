@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { applySiteConfig, playReveal, revealRemaining, REVEAL_FAILSAFE_MS } from '../public/assets/js/main.js';
-import { FakeElement } from './helpers/fake-dom.mjs';
+import { applySiteConfig, initConsultTypeLinks, selectConsultType, playReveal, revealRemaining, REVEAL_FAILSAFE_MS } from '../public/assets/js/main.js';
+import { FakeElement, createDocument } from './helpers/fake-dom.mjs';
 
 // Tiny DOM stand-in: just enough for the selectors applySiteConfig uses.
 function el({ id, href, dataset = {}, text = '' } = {}) {
@@ -139,20 +139,78 @@ test('booking link prefers bookingUrl, then WhatsApp, then #contacto', () => {
   assert.equal(a.attrs.href, '#contacto');
 });
 
+const withTrack = (count) => ({ ...el({ id: 'testimonials-track' }), children: Array.from({ length: count }, () => el()) });
+
 test('showTestimonials=false hides the section and its nav links', () => {
   const section = el({ id: 'testimonios' });
   const nav = el({ href: '#testimonios' });
   const other = el({ href: '#servicios' });
-  applySiteConfig({ ...EMPTY, showTestimonials: false }, fakeRoot([section, nav, other]));
+  applySiteConfig({ ...EMPTY, showTestimonials: false }, fakeRoot([section, nav, other, withTrack(2)]));
   assert.equal(section.style.display, 'none');
   assert.equal(nav.style.display, 'none');
   assert.equal(other.style.display, undefined);
 });
 
-test('showTestimonials=true leaves them visible', () => {
+test('showTestimonials=true with slides reveals the section shipped hidden', () => {
+  const section = el({ id: 'testimonios' });
+  const nav = el({ href: '#testimonios' });
+  section.hidden = nav.hidden = true;
+  section.style.display = nav.style.display = 'none';
+  applySiteConfig({ ...EMPTY, showTestimonials: true }, fakeRoot([section, nav, withTrack(3)]));
+  for (const node of [section, nav]) {
+    assert.equal(node.hidden, false);
+    assert.ok(!node.style.display);
+  }
+});
+
+test('showTestimonials=true but an empty track keeps the section hidden', () => {
+  const section = el({ id: 'testimonios' });
+  const nav = el({ href: '#testimonios' });
+  applySiteConfig({ ...EMPTY, showTestimonials: true }, fakeRoot([section, nav, withTrack(0)]));
+  assert.equal(section.style.display, 'none');
+  assert.equal(nav.style.display, 'none');
+});
+
+test('a missing track also keeps the section hidden', () => {
   const section = el({ id: 'testimonios' });
   applySiteConfig({ ...EMPTY, showTestimonials: true }, fakeRoot([section]));
-  assert.equal(section.style.display, undefined);
+  assert.equal(section.style.display, 'none');
+});
+
+// --- consult type preselection --------------------------------------------------
+
+function consultFixture(initial = 'personal') {
+  const doc = createDocument();
+  const select = doc.createElement('select');
+  select.id = 'contact-type';
+  select.setAttribute('id', 'contact-type');
+  select.value = initial;
+  select.options = ['personal', 'empresa', 'charla'].map((value) => ({ value }));
+  doc.body.append(select);
+  return { doc, select };
+}
+
+test('selectConsultType preselects a known consult type in the contact select', () => {
+  const { doc, select } = consultFixture();
+  assert.equal(selectConsultType('empresa', doc), true);
+  assert.equal(select.value, 'empresa');
+});
+
+test('selectConsultType ignores unknown types and a missing select', () => {
+  const { doc, select } = consultFixture('charla');
+  assert.equal(selectConsultType('otro', doc), false);
+  assert.equal(select.value, 'charla');
+  assert.equal(selectConsultType('empresa', createDocument()), false);
+});
+
+test('clicking a [data-consult-type] link preselects the type', () => {
+  const { doc, select } = consultFixture();
+  const link = doc.createElement('a');
+  link.dataset.consultType = 'empresa';
+  doc.body.append(link);
+  initConsultTypeLinks(doc);
+  link.dispatch('click', {});
+  assert.equal(select.value, 'empresa');
 });
 
 test('whatsapp text shows the normalized digits of a formatted number', () => {

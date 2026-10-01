@@ -4,11 +4,12 @@
  *
  * - applySiteConfig: fills contact links/text from the config
  * - header, mobile menu, testimonials carousel, scroll reveal
+ * - consult-type preselection for CTAs that point at the contact form
  * - forms: delegated to forms.js
  *
  * Nothing touches the DOM at import time, so applySiteConfig can be unit tested.
  */
-import { initForms, normalizePhone, whatsappLink } from './forms.js';
+import { CONSULT_TYPES, initForms, normalizePhone, whatsappLink } from './forms.js';
 
 const FALLBACK_HREF = '#contacto';
 const DEFAULT_WA_TEXT = 'Hola Claudia, quiero más información';
@@ -71,6 +72,11 @@ function hide(el) {
   el.style.display = 'none';
 }
 
+function show(el) {
+  el.hidden = false;
+  el.style.display = '';
+}
+
 export function applySiteConfig(config = {}, root = document) {
   for (const el of root.querySelectorAll('[data-link]')) {
     const href = resolveLink(el.dataset.link, config, el) || FALLBACK_HREF;
@@ -94,8 +100,32 @@ export function applySiteConfig(config = {}, root = document) {
     if (key && !isConfigured(key, config)) hide(el);
   }
 
-  if (!config.showTestimonials) {
-    for (const el of root.querySelectorAll('#testimonios, [href="#testimonios"]')) hide(el);
+  // The testimonials ship hidden. They appear only when enabled in the config
+  // AND the carousel actually has slides, so an empty section never renders.
+  const track = root.querySelectorAll('#testimonials-track')[0];
+  const showTestimonials = Boolean(config.showTestimonials) && Boolean(track?.children?.length);
+  for (const el of root.querySelectorAll('#testimonios, [href="#testimonios"]')) {
+    if (showTestimonials) show(el);
+    else hide(el);
+  }
+}
+
+// ============================================================================
+// Contact form: preselect the consult type from a CTA
+// ============================================================================
+
+/** Sets the contact select to a known consult type. Returns whether it changed. */
+export function selectConsultType(type, root = document) {
+  const select = root.querySelector('#contact-type');
+  if (!select || !Object.hasOwn(CONSULT_TYPES, type)) return false;
+  select.value = type;
+  return true;
+}
+
+/** Links with data-consult-type="..." keep their #contacto href and also preselect the type. */
+export function initConsultTypeLinks(root = document) {
+  for (const link of root.querySelectorAll('[data-consult-type]')) {
+    link.addEventListener('click', () => selectConsultType(link.dataset.consultType, root));
   }
 }
 
@@ -289,6 +319,7 @@ function init() {
     () => applySiteConfig(config, document),
     initHeader,
     initMobileMenu,
+    () => initConsultTypeLinks(document),
     initCarousel,
     initScrollReveal,
     () => initForms(document, config),

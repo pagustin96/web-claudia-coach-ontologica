@@ -1,7 +1,7 @@
 /**
  * Minimal DOM stand-in for unit tests. It implements only what forms.js and
  * main.js touch: attributes, dataset, classList, tree edits (append/after/remove)
- * and a tiny querySelectorAll (`tag`, `[attr]`, `[attr="value"]`, `tag[attr]`).
+ * and a tiny querySelectorAll (`#id`, `tag`, `[attr]`, `[attr="value"]`, `tag[attr]`).
  */
 
 const camel = (s) => s.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
@@ -96,6 +96,8 @@ export class FakeElement {
   }
 
   matches(selector) {
+    const byId = selector.trim().match(/^#([\w-]+)$/);
+    if (byId) return this.id === byId[1];
     const m = selector.trim().match(/^([a-z][a-z0-9]*)?(?:\[([\w-]+)(?:="([^"]*)")?\])?$/i);
     if (!m) throw new Error(`fake DOM does not support selector: ${selector}`);
     const [, tag, attr, value] = m;

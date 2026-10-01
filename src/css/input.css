@@ -35,6 +35,11 @@
     outline-offset: 2px;
   }
 
+  /* The footer is dark: teal-600 would barely show there. */
+  footer :focus-visible {
+    outline-color: rgb(var(--color-accent-400));
+  }
+
   ::selection {
     background-color: rgb(var(--color-primary-700));
     color: white;
@@ -92,7 +97,9 @@
     padding: 0.75rem 1.5rem;
     font-weight: var(--font-weight-semibold);
     font-size: var(--font-size-sm);
-    line-height: 1;
+    line-height: 1.25;
+    text-align: center;
+    min-height: 2.75rem; /* 44px tap target */
     border-radius: var(--border-radius);
     transition: all var(--transition-fast);
     cursor: pointer;
@@ -204,11 +211,17 @@
 
   /* Decorative */
   .text-gradient {
-    background: linear-gradient(135deg, rgb(var(--color-primary-600)), rgb(var(--color-accent-500)));
+    /* Teal only: amber text would drop below 3:1 on the off-white background. */
+    background: linear-gradient(135deg, rgb(var(--color-primary-800)), rgb(var(--color-primary-600)));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
+}
+
+/* A display utility (flex, inline-flex...) must not defeat the hidden attribute. */
+[hidden] {
+  display: none !important;
 }
 
 /* ==========================================================================

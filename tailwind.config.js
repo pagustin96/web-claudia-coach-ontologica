@@ -19,6 +19,8 @@ module.exports = {
       colors: {
         primary: scale('primary'),
         accent: scale('accent'),
+        // Official WhatsApp green: used only by the floating button.
+        whatsapp: { DEFAULT: '#25D366', dark: '#1EBE5A' },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
