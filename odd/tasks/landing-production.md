@@ -22,7 +22,7 @@ The prototype uses the Tailwind Play CDN, discards form submissions, contains fa
 ## Tasks
 - [x] T1 Scaffold + test harness (`public/`, `src/css/`, `.gitignore`, `package.json`, `vercel.json`, `tests/site.test.mjs`) — route: delegated writer
 - [x] T2 Tailwind build + brand palette (drop CDN/inline styles, compiled `output.css`) — route: delegated writer
-- [ ] T3 Images (Pillow script, trimmed logo, favicon set, og-image, local placeholders) — route: delegated writer
+- [x] T3 Images (Pillow script, trimmed logo, favicon set, og-image, local placeholders) — route: delegated writer
 - [ ] T4 JS consolidation (`config.js`, `forms.js` test-first, inline scripts into `main.js`) — route: delegated writer
 - [ ] T5 Content + design pass (identity, Bienestar 360, WhatsApp float, agenda CTA, testimonials gate) — route: delegated writer
 - [ ] T6 SEO + legal (meta/OG, robots, sitemap, `privacidad.html`) — route: delegated writer
@@ -39,9 +39,11 @@ _(updated per task with commit hashes)_
 
 - T1 done, commit `3c41210`. RED: `node --test tests/*.test.mjs` failed with ENOENT on `public/index.html`. After the moves, (c) failed on `assets/css/variables.css` and `favicon.ico` (dangling refs removed: variables.css is now imported by input.css, favicon set arrives in T3). GREEN: (c) passes; (a), (b), (d) kept as `test.todo` (honest: RED until T2). Rationale: node 24 treats `node --test tests/` as a module path, so the runner is `node --test tests/*.test.mjs`. Logo moved to `public/assets/images/logo-source.jpeg` (T3 processes it).
 - T2 done, commit `423315e`. RED: with (a), (b), (d) enabled plus output.css tests, 5 of 6 failed. GREEN: `npm test` (pretest builds) 6/6 pass; every class in index.html resolves in output.css (scripted check); output.css 25.9 KB minified. Rationale: palette as RGB-channel CSS variables mapped in tailwind.config.js so opacity modifiers work; `animate-fade-in/slide-up` safelisted because main.js builds them at runtime; buttons use primary-700 (5.36:1 with white), accent buttons dark text (9.7:1); removed unused color families (secondary/success/error/surface/background) and dark-mode block; Tailwind default gray/green/yellow/pink/purple/blue/red still used by index.html and main.js (left to T5 design pass).
+- Review follow-ups (commit `7e8e38b`): vercel.json header sources use plain groups (path-to-regexp rejects `(?:`), images cache `max-age=604800, stale-while-revalidate=86400` (filenames are unhashed, no `immutable`), css/js 1h. site.test.mjs now checks every `class` token against output.css as an escaped selector (verified non-vacuous by injecting `btn-secondary`, `card-bordered`, `md:w-[13px]`; real HTML had no missing classes) plus vercel.json assertions; substring needles replaced by boundary regexes.
+- T3 done, commit "feat: add processed logo, favicon set, og image and local placeholders" (hash: see git log). RED: `tests/assets.test.mjs` 8 of 9 failed (favicon set, manifest, logo variants, logo-source still deployed, Unsplash hotlinks, no icon links, invert filter, img width/height). GREEN: `npm test` 16/16 pass. Rationale: `scripts/build-images.py` (Pillow only, idempotent, verified by identical checksums on rerun) turns the JPEG into transparent PNGs by recoloring ink to exact brand colors with soft alpha (clean edges, amber figure not translucent); `logo-white.png` replaces the `brightness-0 invert` hack; the mark is isolated at the empty row band above the script; source moved to `assets-src/` so it is not deployed; Unsplash images downloaded once as local webp (8 unique photos, placeholders to be replaced with Claudia's real photos in T5/pending data); every img has width/height/alt, hero `fetchpriority="high"`, rest lazy.
 
 ## Next step
-T3.
+T4.
 
 ## Pending data from Claudia
 WhatsApp number, email, socials, domain, Web3Forms key, booking URL, photo, bio, credentials, real testimonials, lead-magnet guide.
