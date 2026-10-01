@@ -1,6 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { applySiteConfig } from '../public/assets/js/main.js';
+import { readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { applySiteConfig, playReveal, revealRemaining, REVEAL_FAILSAFE_MS } from '../public/assets/js/main.js';
+import { FakeElement } from './helpers/fake-dom.mjs';
 
 // Tiny DOM stand-in: just enough for the selectors applySiteConfig uses.
 function el({ id, href, dataset = {}, text = '' } = {}) {
@@ -149,4 +153,56 @@ test('showTestimonials=true leaves them visible', () => {
   const section = el({ id: 'testimonios' });
   applySiteConfig({ ...EMPTY, showTestimonials: true }, fakeRoot([section]));
   assert.equal(section.style.display, undefined);
+});
+
+test('whatsapp text shows the normalized digits of a formatted number', () => {
+  const wa = el({ text: 'Escribime', dataset: { configText: 'whatsapp' } });
+  applySiteConfig({ ...EMPTY, whatsappNumber: '+54 9 11 2345-6789' }, fakeRoot([wa]));
+  assert.equal(wa.textContent, '+5491123456789');
+});
+
+test('main.js reuses forms.js normalizePhone instead of its own digit stripping', () => {
+  const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'public/assets/js/main.js'), 'utf8');
+  assert.match(source, /normalizePhone/);
+  assert.ok(!/replace\(\/\\D\/g/.test(source), 'duplicate phone normalizer found');
+});
+
+// --- scroll reveal -----------------------------------------------------------
+
+const animated = (kind = 'fade-in') => {
+  const node = new FakeElement('div');
+  node.dataset.animate = kind;
+  return node;
+};
+
+test('playReveal shows and animates an element that is still hidden', () => {
+  const node = animated('slide-up');
+  assert.equal(playReveal(node), true);
+  assert.ok(node.hasAttribute('data-revealed'));
+  assert.ok(node.classList.contains('animate-slide-up'));
+});
+
+test('playReveal never restarts the animation of an element already shown by the failsafe', () => {
+  const nodes = [animated(), animated('slide-up')];
+  assert.equal(revealRemaining(nodes), 2);
+  for (const node of nodes) {
+    assert.equal(playReveal(node), false);
+    assert.ok(!node.className.includes('animate-'), 'no animation class after the failsafe');
+  }
+});
+
+test('revealRemaining only touches elements that are still hidden', () => {
+  const shown = animated();
+  playReveal(shown);
+  const hidden = animated();
+  assert.equal(revealRemaining([shown, hidden]), 1);
+  assert.ok(hidden.hasAttribute('data-revealed'));
+  assert.ok(!hidden.className.includes('animate-'), 'failsafe reveals without animating');
+});
+
+test('the JS failsafe fires before the CSS one, which only covers a dead script', () => {
+  const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'public/assets/css/output.css'), 'utf8');
+  const cssDelay = Number(css.match(/animation:\s*reveal-failsafe\s+[\d.]+s\s+([\d.]+)s/)?.[1]);
+  assert.ok(Number.isFinite(cssDelay), 'CSS failsafe animation not found');
+  assert.ok(cssDelay * 1000 > REVEAL_FAILSAFE_MS, `CSS failsafe (${cssDelay}s) must come after the JS one (${REVEAL_FAILSAFE_MS}ms)`);
 });

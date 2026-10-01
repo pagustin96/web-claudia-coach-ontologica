@@ -30,3 +30,7 @@ test('siteUrl and showTestimonials have their safe defaults', () => {
   assert.equal(cfg.siteUrl, 'https://claudia-samudio.vercel.app');
   assert.equal(cfg.showTestimonials, false);
 });
+
+test('config.js documents that siteUrl feeds canonical/OG tags (T6)', () => {
+  assert.match(readFileSync(file, 'utf8'), /siteUrl\s+Public site URL, used for canonical\/OG \(T6\)\./);
+});

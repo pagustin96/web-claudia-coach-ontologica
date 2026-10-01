@@ -8,7 +8,7 @@
  *
  * Nothing touches the DOM at import time, so applySiteConfig can be unit tested.
  */
-import { initForms, whatsappLink } from './forms.js';
+import { initForms, normalizePhone, whatsappLink } from './forms.js';
 
 const FALLBACK_HREF = '#contacto';
 const DEFAULT_WA_TEXT = 'Hola Claudia, quiero más información';
@@ -45,7 +45,7 @@ function resolveText(kind, config) {
     case 'email':
       return config.email || null;
     case 'whatsapp': {
-      const digits = String(config.whatsappNumber ?? '').replace(/\D/g, '');
+      const digits = normalizePhone(config.whatsappNumber);
       return digits ? `+${digits}` : null;
     }
     case 'instagram': {
@@ -225,14 +225,37 @@ function initCarousel() {
 // ============================================================================
 
 // CSS hides `.js [data-animate]:not([data-revealed])`; setting the attribute shows it.
-const reveal = (el) => el.setAttribute('data-revealed', '');
+// Two failsafes keep content from staying hidden:
+//  - JS: after REVEAL_FAILSAFE_MS everything still hidden is shown WITHOUT animating.
+//  - CSS: a slightly later animation in input.css, only for the case where this script never runs.
+// Once an element carries data-revealed it never animates again, so neither failsafe can cause a flash.
+export const REVEAL_FAILSAFE_MS = 4000;
+
+/** Shows and animates an element, unless it is already visible. Returns whether it animated. */
+export function playReveal(el) {
+  if (el.hasAttribute('data-revealed')) return false;
+  el.setAttribute('data-revealed', '');
+  el.classList.add(`animate-${el.dataset.animate}`);
+  return true;
+}
+
+/** Shows every element that is still hidden, without animation. Returns how many were revealed. */
+export function revealRemaining(items) {
+  let count = 0;
+  for (const el of items) {
+    if (el.hasAttribute('data-revealed')) continue;
+    el.setAttribute('data-revealed', '');
+    count++;
+  }
+  return count;
+}
 
 function initScrollReveal() {
   const items = document.querySelectorAll('[data-animate]');
   if (!items.length) return;
 
   if (reducedMotion() || !('IntersectionObserver' in window)) {
-    items.forEach(reveal);
+    revealRemaining(items);
     return;
   }
 
@@ -242,15 +265,17 @@ function initScrollReveal() {
         if (!entry.isIntersecting) continue;
         const el = entry.target;
         observer.unobserve(el);
-        setTimeout(() => {
-          reveal(el);
-          el.classList.add(`animate-${el.dataset.animate}`);
-        }, Number(el.dataset.animateDelay) || 0);
+        setTimeout(() => playReveal(el), Number(el.dataset.animateDelay) || 0);
       }
     },
     { threshold: 0.1, rootMargin: '0px 0px -50px 0px' }
   );
   items.forEach((el) => observer.observe(el));
+
+  setTimeout(() => {
+    revealRemaining(items);
+    observer.disconnect();
+  }, REVEAL_FAILSAFE_MS);
 }
 
 // ============================================================================

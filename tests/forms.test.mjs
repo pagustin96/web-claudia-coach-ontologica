@@ -6,6 +6,9 @@ import {
   buildPayload,
   submitForm,
   whatsappLink,
+  normalizePhone,
+  MESSAGES,
+  DEFAULT_TIMEOUT_MS,
 } from '../public/assets/js/forms.js';
 
 const CONFIG = { web3formsKey: 'test-key-123' };
@@ -227,4 +230,104 @@ test('whatsappLink returns null without a usable number', () => {
 
 test('whatsappLink omits the text parameter when no text is given', () => {
   assert.equal(whatsappLink('5491123456789'), 'https://wa.me/5491123456789');
+});
+
+test('normalizePhone keeps digits only', () => {
+  assert.equal(normalizePhone('+54 9 11 2345-6789'), '5491123456789');
+  assert.equal(normalizePhone('(011) 4555.1234'), '01145551234');
+  for (const v of [undefined, null, '', '+-']) assert.equal(normalizePhone(v), '');
+});
+
+// --- MESSAGES --------------------------------------------------------------
+
+test('MESSAGES is the single source of user-facing submission texts (voseo)', () => {
+  assert.equal(
+    MESSAGES.maybeDelivered,
+    'Puede que tu mensaje se haya enviado. Si no recibís respuesta, escribime por WhatsApp.'
+  );
+  assert.ok(MESSAGES.notConfigured && MESSAGES.sending && MESSAGES.success.contact && MESSAGES.success.lead);
+  assert.match(MESSAGES.rejected('Invalid key'), /Invalid key/);
+  assert.ok(!/Invalid/.test(MESSAGES.rejected()), 'no detail, no parentheses');
+  assert.ok(Object.isFrozen(MESSAGES));
+});
+
+test('validation messages use voseo, not tuteo', () => {
+  const errors = validateContact({}).errors;
+  const all = Object.values(errors).join(' ');
+  assert.doesNotMatch(all, /\b(Ingresa|Debes|Elige|Cuéntame)\b/);
+  assert.match(all, /Ingresá|Tenés|Contame/);
+});
+
+// --- submitForm: timeout, network and body parsing ---------------------------
+
+test('submitForm passes an AbortSignal and defaults to a 15 s timeout', async () => {
+  assert.equal(DEFAULT_TIMEOUT_MS, 15000);
+  const fetchImpl = mockFetch({ ok: true, json: async () => ({ success: true }) });
+  await submitForm('lead', validLead(), CONFIG, fetchImpl);
+  assert.ok(fetchImpl.calls[0].init.signal instanceof AbortSignal);
+});
+
+test('submitForm returns timeout when fetch never resolves and the signal aborts it', async () => {
+  let aborted = false;
+  const fetchImpl = (url, init) =>
+    new Promise((_, reject) => {
+      init.signal.addEventListener('abort', () => {
+        aborted = true;
+        reject(new DOMException('The operation was aborted', 'AbortError'));
+      });
+    });
+  const result = await submitForm('contact', validContact(), CONFIG, fetchImpl, { timeoutMs: 20 });
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'timeout');
+  assert.equal(result.message, MESSAGES.maybeDelivered);
+  assert.equal(aborted, true, 'the request is aborted, not just abandoned');
+});
+
+test('submitForm times out even when fetch ignores the signal', async () => {
+  const result = await submitForm('lead', validLead(), CONFIG, () => new Promise(() => {}), { timeoutMs: 20 });
+  assert.equal(result.reason, 'timeout');
+});
+
+test('submitForm times out while the body is still being read', async () => {
+  const fetchImpl = async () => ({ ok: true, json: () => new Promise(() => {}) });
+  const result = await submitForm('lead', validLead(), CONFIG, fetchImpl, { timeoutMs: 20 });
+  assert.equal(result.reason, 'timeout');
+});
+
+test('submitForm does not time out a fast response and clears its timer', async () => {
+  const fetchImpl = mockFetch({ ok: true, json: async () => ({ success: true }) });
+  const result = await submitForm('lead', validLead(), CONFIG, fetchImpl, { timeoutMs: 1000 });
+  assert.deepEqual(result, { ok: true });
+});
+
+test('submitForm network errors carry the "may have been delivered" message', async () => {
+  const fetchImpl = async () => {
+    throw new TypeError('Failed to fetch');
+  };
+  const result = await submitForm('contact', validContact(), CONFIG, fetchImpl);
+  assert.equal(result.reason, 'network');
+  assert.equal(result.message, MESSAGES.maybeDelivered);
+});
+
+test('submitForm treats an unparsable body as rejected even when the status is ok', async () => {
+  const fetchImpl = mockFetch({
+    ok: true,
+    status: 200,
+    json: async () => {
+      throw new SyntaxError('Unexpected end of JSON input');
+    },
+  });
+  const result = await submitForm('lead', validLead(), CONFIG, fetchImpl);
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'rejected');
+  assert.equal(result.message, MESSAGES.rejected());
+});
+
+test('submitForm not_configured uses the shared message', async () => {
+  const result = await submitForm('lead', validLead(), {}, mockFetch({}));
+  assert.equal(result.message, MESSAGES.notConfigured);
+});
+
+test('submitForm throws on an unknown kind instead of reporting a network error', async () => {
+  await assert.rejects(() => submitForm('newsletter', validLead(), CONFIG, mockFetch({})), /kind/);
 });

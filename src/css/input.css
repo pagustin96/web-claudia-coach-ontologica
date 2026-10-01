@@ -214,13 +214,16 @@
 /* ==========================================================================
    Scroll reveal
    Content is hidden only when JS is available (html.js, set in <head>) and
-   until main.js marks it with data-revealed. The failsafe animation reveals it
-   anyway after 4s so a script failure can never leave the page blank.
+   until main.js marks it with data-revealed. main.js reveals everything still
+   hidden after 4s; this animation (5s) only matters when the script never runs,
+   so a script failure can never leave the page blank. It starts after the JS
+   failsafe so the IntersectionObserver never restarts an animation on content
+   the CSS already showed.
    ========================================================================== */
 
 .js [data-animate]:not([data-revealed]) {
   opacity: 0;
-  animation: reveal-failsafe 0.01s 4s forwards;
+  animation: reveal-failsafe 0.01s 5s forwards;
 }
 
 @keyframes reveal-failsafe {

@@ -131,15 +131,17 @@ test('config.js loads as a classic script and main.js as a module, at the end of
   assert.ok(config > html.indexOf('</main>'), 'scripts belong at the end of <body>');
 });
 
-test('contact and lead forms are wired for Web3Forms', () => {
+test('forms are JS-only: no native POST path, honeypot kept, noscript note inside', () => {
   for (const kind of ['contact', 'lead']) {
     const form = html.match(new RegExp(`<form\\b[^>]*data-form="${kind}"[^>]*>[\\s\\S]*?</form>`))?.[0];
     assert.ok(form, `form[data-form="${kind}"] not found`);
     const open = form.match(/<form\b[^>]*>/)[0];
     assert.match(open, /\bnovalidate\b/);
-    assert.match(open, /method="POST"/i);
-    assert.match(open, /action="https:\/\/api\.web3forms\.com\/submit"/);
-    assert.match(form, /<input[^>]*type="hidden"[^>]*name="access_key"/);
+    assert.ok(!/\baction\s*=/.test(open), 'a native action would bypass buildPayload');
+    assert.ok(!/\bmethod\s*=/.test(open), 'a native method would bypass buildPayload');
+    for (const name of ['access_key', 'subject', 'from_name']) {
+      assert.ok(!new RegExp(`<input[^>]*name="${name}"`).test(form), `hidden ${name} input must not exist`);
+    }
     const honeypot = form.match(/<input[^>]*name="botcheck"[^>]*>/)?.[0];
     assert.ok(honeypot, 'honeypot missing');
     assert.match(honeypot, /type="checkbox"/);
@@ -147,7 +149,11 @@ test('contact and lead forms are wired for Web3Forms', () => {
     assert.match(honeypot, /tabindex="-1"/);
     assert.match(honeypot, /autocomplete="off"/);
     for (const name of ['name', 'email']) assert.match(form, new RegExp(`name="${name}"`));
+    const noscript = form.match(/<noscript>([\s\S]*?)<\/noscript>/)?.[1];
+    assert.ok(noscript, 'noscript note missing');
+    assert.match(noscript, /Para enviar el formulario necesitás JavaScript habilitado\. También podés escribirme por WhatsApp o email\./);
   }
+  assert.ok(!/web3forms/i.test(html), 'the endpoint lives only in forms.js');
 });
 
 test('contact form has the extra fields and a consultType select', () => {

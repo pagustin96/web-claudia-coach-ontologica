@@ -18,7 +18,7 @@
  *                     "not enabled yet" message with WhatsApp/email fallbacks.
  *   bookingUrl        Calendly / Cal.com link for the free session. If empty,
  *                     booking buttons fall back to WhatsApp, then to #contacto.
- *   siteUrl           Public site URL, used for canonical and OG tags.
+ *   siteUrl           Public site URL, used for canonical/OG (T6).
  *   showTestimonials  Show the testimonials section. Keep false until Claudia
  *                     provides real testimonials.
  */
