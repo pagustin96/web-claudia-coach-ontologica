@@ -1,5 +1,13 @@
 # Especificaciones Web - Claudia Coach Ontológica
 
+> **Estado / cambios respecto al spec original** (actualizado en la implementación)
+>
+> - **Paleta:** teal (`#00A99D`) y ámbar (`#FBB03B`) tomados del logo, en lugar del azul navy original.
+> - **Sección nueva:** Bienestar Consciente 360 (propuesta B2B para gimnasios y empresas), después de Servicios.
+> - **Formularios:** se envían con Web3Forms (sin backend); la clave se configura en `public/assets/js/config.js`.
+> - **Testimonios:** la sección está oculta hasta que existan testimonios reales y `showTestimonials` sea `true`.
+> - Guía de uso y despliegue: ver `README.md`.
+
 ## 1. Información del Proyecto
 
 **Cliente:** Claudia - Coach Ontológica
