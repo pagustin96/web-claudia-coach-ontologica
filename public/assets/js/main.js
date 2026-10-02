@@ -133,8 +133,8 @@ export function initConsultTypeLinks(root = document) {
 // Header: shadow once the page is scrolled
 // ============================================================================
 
-function initHeader() {
-  const header = document.querySelector('[data-sticky-header]');
+function initHeader(root = document) {
+  const header = root.querySelector('[data-sticky-header]');
   if (!header) return;
   const threshold = Number(header.dataset.stickyThreshold) || 50;
   let ticking = false;
@@ -164,9 +164,9 @@ function initHeader() {
 // Mobile menu
 // ============================================================================
 
-function initMobileMenu() {
-  const button = document.getElementById('mobile-menu-button');
-  const menu = document.getElementById('mobile-menu');
+function initMobileMenu(root = document) {
+  const button = root.querySelector('#mobile-menu-button');
+  const menu = root.querySelector('#mobile-menu');
   if (!button || !menu) return;
 
   const setOpen = (open) => {
@@ -176,7 +176,7 @@ function initMobileMenu() {
 
   button.addEventListener('click', () => setOpen(menu.classList.contains('hidden')));
   menu.querySelectorAll('a').forEach((link) => link.addEventListener('click', () => setOpen(false)));
-  document.addEventListener('keydown', (e) => {
+  root.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !menu.classList.contains('hidden')) {
       setOpen(false);
       button.focus();
@@ -196,10 +196,10 @@ function visibleSlides() {
   return 1;
 }
 
-function initCarousel() {
-  const track = document.getElementById('testimonials-track');
-  const prev = document.getElementById('carousel-prev');
-  const next = document.getElementById('carousel-next');
+function initCarousel(root = document) {
+  const track = root.querySelector('#testimonials-track');
+  const prev = root.querySelector('#carousel-prev');
+  const next = root.querySelector('#carousel-next');
   const container = track?.closest('[data-carousel]');
   if (!track || !prev || !next || !container) return;
 
@@ -280,8 +280,8 @@ export function revealRemaining(items) {
   return count;
 }
 
-function initScrollReveal() {
-  const items = document.querySelectorAll('[data-animate]');
+function initScrollReveal(root = document) {
+  const items = root.querySelectorAll('[data-animate]');
   if (!items.length) return;
 
   if (reducedMotion() || !('IntersectionObserver' in window)) {
@@ -312,17 +312,17 @@ function initScrollReveal() {
 // Init
 // ============================================================================
 
-function init() {
-  const config = globalThis.SITE_CONFIG ?? {};
+/** Runs every startup step against `root`. Steps tolerate pages without the landing sections. */
+export function init(root = document, config = globalThis.SITE_CONFIG ?? {}) {
   // Each step is isolated so one failure cannot stop the rest (or leave content hidden).
   for (const step of [
-    () => applySiteConfig(config, document),
-    initHeader,
-    initMobileMenu,
-    () => initConsultTypeLinks(document),
-    initCarousel,
-    initScrollReveal,
-    () => initForms(document, config),
+    () => applySiteConfig(config, root),
+    () => initHeader(root),
+    () => initMobileMenu(root),
+    () => initConsultTypeLinks(root),
+    () => initCarousel(root),
+    () => initScrollReveal(root),
+    () => initForms(root, config),
   ]) {
     try {
       step();

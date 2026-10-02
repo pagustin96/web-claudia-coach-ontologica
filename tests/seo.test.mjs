@@ -17,6 +17,17 @@ const metaContent = (source, attr, name) =>
 const canonical = (source) => source.match(/<link\s+rel="canonical"\s+href="([^"]*)"/)?.[1];
 const originOf = (url) => new URL(url).origin;
 
+const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+const lastmods = (xml) => [...xml.matchAll(/<lastmod>([^<]*)<\/lastmod>/g)].map((m) => m[1]);
+const isIsoDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(value) && new Date(`${value}T00:00:00Z`).toISOString().startsWith(value);
+/** "1 de octubre de 2026" -> "2026-10-01" (null when the text does not match). */
+function spanishDateToIso(text) {
+  const m = text.match(/(\d{1,2}) de ([a-záéíóú]+) de (\d{4})/i);
+  const month = m && MONTHS.indexOf(m[2].toLowerCase()) + 1;
+  if (!m || !month) return null;
+  return `${m[3]}-${String(month).padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+}
+
 // --- index.html head metadata -------------------------------------------------
 
 test('index.html has an absolute https canonical URL', () => {
@@ -104,7 +115,8 @@ test('sitemap.xml is well-formed and lists both pages with lastmod', () => {
   assert.equal(locs.length, 2);
   const origin = originOf(locs[0]);
   assert.deepEqual(locs, [`${origin}/`, `${origin}/privacidad`]);
-  assert.equal((xml.match(/<lastmod>2026-10-01<\/lastmod>/g) ?? []).length, 2);
+  for (const date of lastmods(xml)) assert.ok(isIsoDate(date), `lastmod is not a valid YYYY-MM-DD date: ${date}`);
+  assert.equal(lastmods(xml).length, 2);
 });
 
 // --- privacidad.html ------------------------------------------------------------
@@ -123,11 +135,21 @@ test('privacidad.html exists with one h1, a canonical and a mention of Ley 25.32
 
 test('privacidad.html covers the required policy topics', () => {
   const page = privacy();
-  for (const topic of [/Claudia Viviana Samudio/, /Web3Forms/, /Vercel/, /AAIP|Agencia de Acceso a la Información Pública/, /acceso/i, /rectificación/i, /actualización/i, /supresión/i, /cookies/i, /1 de octubre de 2026/]) {
+  for (const topic of [/Claudia Viviana Samudio/, /Web3Forms/, /Vercel/, /AAIP|Agencia de Acceso a la Información Pública/, /acceso/i, /rectificación/i, /actualización/i, /supresión/i, /cookies/i, /Última actualización:/]) {
     assert.match(page, topic);
   }
   assert.match(page, /data-link="email"[^>]*data-config-text="email"|data-config-text="email"[^>]*data-link="email"/);
   assert.match(page, /formulario de contacto/);
+});
+
+test('the privacy page "Última actualización" date matches the sitemap lastmod of /privacidad', () => {
+  const shown = privacy().match(/Última actualización:\s*([^<]+)</)?.[1];
+  assert.ok(shown, 'Última actualización line missing');
+  const iso = spanishDateToIso(shown);
+  assert.ok(iso && isIsoDate(iso), `unparsable date: ${shown}`);
+  const xml = read('sitemap.xml');
+  const entry = xml.match(/<url>\s*<loc>[^<]*\/privacidad<\/loc>\s*<lastmod>([^<]*)<\/lastmod>/)?.[1];
+  assert.equal(entry, iso);
 });
 
 test('privacidad.html loads the compiled CSS, config.js and main.js', () => {

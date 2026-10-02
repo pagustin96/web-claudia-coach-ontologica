@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { applySiteConfig, initConsultTypeLinks, selectConsultType, playReveal, revealRemaining, REVEAL_FAILSAFE_MS } from '../public/assets/js/main.js';
+import { applySiteConfig, init, initConsultTypeLinks, selectConsultType, playReveal, revealRemaining, REVEAL_FAILSAFE_MS } from '../public/assets/js/main.js';
 import { initForms } from '../public/assets/js/forms.js';
 import { FakeElement, createDocument } from './helpers/fake-dom.mjs';
 
@@ -284,4 +284,45 @@ test('the privacy email link and its wrapper are hidden until an email is config
   assert.equal(wrapper2.hidden, false);
   assert.equal(link2.getAttribute('href'), 'mailto:hola@example.com');
   assert.equal(link2.textContent, 'hola@example.com');
+});
+
+// --- real startup path --------------------------------------------------------
+
+/** Runs init() and returns the console.error calls (init isolates each step, so a throw would only be logged). */
+function runInit(root, config) {
+  const errors = [];
+  const original = console.error;
+  console.error = (...args) => errors.push(args);
+  try {
+    init(root, config);
+  } finally {
+    console.error = original;
+  }
+  return errors;
+}
+
+function privacyLikeDocument() {
+  const doc = createDocument();
+  const wrapper = doc.createElement('p');
+  wrapper.dataset.hideIfEmpty = 'email';
+  const link = doc.createElement('a');
+  link.dataset.link = 'email';
+  link.dataset.configText = 'email';
+  link.setAttribute('href', '/#contacto');
+  wrapper.append(link);
+  doc.body.append(wrapper);
+  return { doc, wrapper, link };
+}
+
+test('init runs every startup step on a privacy-like page without errors and hides the empty email', () => {
+  const { doc, wrapper } = privacyLikeDocument();
+  assert.deepEqual(runInit(doc, EMPTY), []);
+  assert.equal(wrapper.hidden, true);
+});
+
+test('init shows the email link when an email is configured', () => {
+  const { doc, wrapper, link } = privacyLikeDocument();
+  assert.deepEqual(runInit(doc, { ...EMPTY, email: 'hola@example.com' }), []);
+  assert.equal(wrapper.hidden, false);
+  assert.equal(link.getAttribute('href'), 'mailto:hola@example.com');
 });
